@@ -47,6 +47,4 @@ Tagi:
     - mając niższy priorytet od smaolotu żądającego - odpowiada zgoda
     - mając wyższy priorytet od samolotu żądającego - odpowiada odmowa i zapisuje go do swojej listy
 - Jeżeli samolot otrzyma prośbę o start, na lotniskowcu na którym się nie znajduje, ani o który się nie ubiega, odpowiada zgodą
-- Jeżeli samolot otrzyma prośbę o start, na lotniskowcu na który chcę wylądować:
-    - mając niższy priorytet od smaolotu żądającego - odpowiada zgoda
-    - mając wyższy priorytet od samolotu żądającego - odpowiada odmowa i zapisuje go do swojej listy
+- Jeżeli samolot otrzyma prośbę o start, na lotniskowcu na który chcę wylądować odpowiada zgodą
