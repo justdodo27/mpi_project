@@ -22,7 +22,7 @@ Tagi:
 - Gdy samolot chce zarezerwować stanowisko na lotniskowcu:
     - Rozsyła żądanie do wszystkich samolotów z tagiem rezerwacji oraz swoim priorytetem.
     - Gdy otrzyma minimum S-Ni zgód, rezerwuje stanowisko postojowe i zmniejsza się liczba stanowisk.
-- Jeżeli samolot otrzyma prośbę o rezerwacja, na lotniskowiec o który się ubiega:
+- Jeżeli samolot otrzyma prośbę o rezerwacje, na lotniskowiec o który się ubiega:
     - mając niższy priorytet od samolotu żądającego - odpowiada zgoda
     - mając wyższy priorytet od samolotu żądającego - odpowiada odmowa i zapisuje go do swojej listy
 - Jeżeli samolot otrzyma prośbę o rezerwację na lotniskowiec, na którym się znajduje lub ma rezerwację, odpowiada odmową i zapisuje go do listy
