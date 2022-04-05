@@ -21,7 +21,7 @@ Tagi:
 **Rezerwacja stanowiska**:
 - Gdy samolot chce zarezerwować stanowisko na lotniskowcu:
     - Rozsyła żądanie do wszystkich samolotów z tagiem rezerwacji oraz swoim priorytetem.
-    - Gdy otrzyma minimum S-Ni zgód, rezerwuje stanowisko postojowe.
+    - Gdy otrzyma minimum S-Ni zgód, rezerwuje stanowisko postojowe i zmniejsza się liczba stanowisk.
 - Jeżeli samolot otrzyma prośbę o rezerwacja, na lotniskowiec o który się ubiega:
     - mając niższy priorytet od samolotu żądającego - odpowiada zgoda
     - mając wyższy priorytet od samolotu żądającego - odpowiada odmowa i zapisuje go do swojej listy
@@ -30,7 +30,7 @@ Tagi:
 
 **Lądowanie na lotniskowcu**:
 - Gdy samolot chce lądować na lotniskowcu:
-    - Rozsyła żądanie do wszystkich samolotów z tagiem lądowania oraz swoim priorytetem.
+    - Jeżeli samolot otrzymał rezerwacje rozsyła żądanie do wszystkich samolotów z tagiem lądowania oraz swoim priorytetem.
     - Gdy otrzyma minimum S-1 zgód, zajmuje sekcje krytyczną i ląduje.
 - Jeżeli samolot otrzyma prośbę o lądowanie, na lotniskowiec na który chce wylądować:
     - mając niższy priorytet od samolotu żądającego - odpowiada zgoda
@@ -38,6 +38,7 @@ Tagi:
 - Jeżeli samolot otrzyma prośbę o lądowanie, na lotniskowcu o który się nie ubiega odpowiada zgodą
 - Jeżeli samolot otrzyma prośbę o lądowanie, na lotniskowcu na którym się znajduje, odpowiada zgodą
 - Jeżeli samolot otrzyma prośbę o lądowanie, na lotniskowcu na którym chce startować odpowiada odmową i zapisuje samolot do swojej listy
+- Jeżeli samolot wyląduje zwalnia pas startowy i rozsyła zgody do procesów z listy.
 
 **Startowanie z lotniskowca**:
 - Gdy samolot chce startować z lotniskowca:
@@ -48,3 +49,4 @@ Tagi:
     - mając wyższy priorytet od samolotu żądającego - odpowiada odmowa i zapisuje go do swojej listy
 - Jeżeli samolot otrzyma prośbę o start, na lotniskowcu na którym się nie znajduje, ani o który się nie ubiega, odpowiada zgodą
 - Jeżeli samolot otrzyma prośbę o start, na lotniskowcu na który chcę wylądować odpowiada zgodą
+- Jeżeli samolot wystartuje zwalnia pas startowt i rozsyła zgody do procesów z listy.
