@@ -8,6 +8,10 @@ Tagi:
 - Lądowanie
 - Start
 
+## TODO
+- jak pyta o rezerwacje nie dostaje odmowy zgody tlyko liczbe zajetych przez nie miejsc miejsc
+- priorytety nie zegar systemowy cos innego
+
 **Działanie algorytmu**:
 - Na poczatku programu, każdy z procesów pobiera czas z zegara.
 - Mniejszy czas to wyższy priorytet.
