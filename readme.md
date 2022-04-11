@@ -30,6 +30,7 @@ Zmienne:
 
 **Rezerwacja stanowiska**:
 - Gdy samolot chce zarezerwować stanowisko na lotniskowcu:
+    - Losuje samolot, do którego będzie się ubiegał.
     - Rozsyła żądanie do wszystkich samolotów z tagiem rezerwacji oraz swoim priorytetem.
     - Gdy otrzyma Ni-suma(k) >= k, gdzie suma(k) to wszystkie odpowiedzi, to rezerwuje stanowisko postojowe.
 - Jeżeli samolot otrzyma prośbę o rezerwacje, na lotniskowiec o który się ubiega:
