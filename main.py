@@ -72,7 +72,10 @@ class Plane():
             if data['ship'] != self.desired_ship:
                 respond_value = 0
             elif data['ship'] == self.desired_ship:
-                respond_value = self.calc_respond_value(data['priority'], source)
+                if self.state == STATES['reserving']:
+                    respond_value = self.calc_respond_value(data['priority'], source)
+                else: # landing, idle, starting - means that place is taken
+                    respond_value = 1
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
             if respond_value == 1:
                 self.reservation_list.add((source, data['id']))
