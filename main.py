@@ -1,5 +1,7 @@
+from typing import Dict
 from mpi4py import MPI
 from time import sleep, time
+from random import randint
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -21,15 +23,6 @@ STATES = {
 
 SHIPS = [2,2]
 
-def print_state(state_num: int) -> str:
-    if state_num == 0:
-        return 'reserving'
-    elif state_num == 1:
-        return 'landing'
-    elif state_num == 2:
-        return 'starting'
-    elif state_num == 3:
-        return 'idle'
 
 class Plane():
     def __init__(self, rank: int):
@@ -37,7 +30,7 @@ class Plane():
         self.rank = rank
         self.counter = 0
         self.state = STATES['reserving']
-        self.desired_ship = 0
+        self.desired_ship = randint(0, len(SHIPS)-1)
         self.reservation_list = set()
         self.airstrip_list = set()
         self.request_id = self.rank * 100
@@ -45,7 +38,17 @@ class Plane():
     def increment_counter(self) -> None:
         self.counter += 1
     
-    def calc_respond_value(self, recv_priority, source) -> int:
+    def print_state(self) -> str:
+        if self.state == 0:
+            return f'reserving {self.desired_ship}'
+        elif self.state == 1:
+            return f'landing on {self.desired_ship}'
+        elif self.state == 2:
+            return f'starting from {self.desired_ship}'
+        elif self.state == 3:
+            return f'idle on {self.desired_ship}...'
+
+    def calc_respond_value(self, recv_priority: int, source: int) -> int:
         if self.counter == recv_priority:
             if self.rank < source:
                 return 1
@@ -67,7 +70,7 @@ class Plane():
             if i == rank: continue
             comm.isend({'id': self.request_id, 'priority': self.counter, 'ship': self.desired_ship}, dest=i, tag=tag)
     
-    def receive_request(self, tag, source, data) -> None:
+    def receive_request(self, tag: int, source: int, data: Dict) -> None:
         if tag == TAGS['reservation']:
             if data['ship'] != self.desired_ship:
                 respond_value = 0
@@ -144,7 +147,7 @@ class Plane():
         
     def idle(self, seconds: int) -> None:
         start_time = time()
-        print(f"{self.rank} ({self.counter}): idle...")
+        print(f"{self.rank} ({self.counter}): {self.print_state()}")
         while True:
             if comm.iprobe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=self.status):
                 req = comm.irecv(source=self.status.Get_source(), tag=self.status.Get_tag())
@@ -178,6 +181,7 @@ class Plane():
         elif self.state == STATES['idle']:
             self.state = STATES['starting']
         elif self.state == STATES['starting']:
+            self.desired_ship = randint(0, len(SHIPS)-1)
             self.state = STATES['reserving']
             self.send_reservation_responds()
             self.send_airstrip_responds()
@@ -189,8 +193,8 @@ class Plane():
             self.wait_for_responds()
             self.request_id += 1
             self.change_state()
-            sleep(0.5)
-            print(f"{self.rank} ({self.counter}): {print_state(self.state)}")
+            sleep(1.5)
+            print(f"{self.rank} ({self.counter}): {self.print_state()}")
 
 plane = Plane(rank)
 
