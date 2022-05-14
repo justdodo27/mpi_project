@@ -23,6 +23,12 @@ STATES = {
 
 SHIPS = [2,2]
 
+FREE_RESERVATION = -1
+FREE_AIRSTRIP = 1
+RESPOND_POS_RESERVATION = 0
+RESPOND_NEG_RESERVATION = 1
+RESPOND_POS_AIRSTRIP = 1
+RESPOND_NEG_AIRSTRIP = 0
 
 class Plane():
     def __init__(self, rank: int):
@@ -48,16 +54,20 @@ class Plane():
         elif self.state == 3:
             return f'idle on {self.desired_ship}...'
 
-    def calc_respond_value(self, recv_priority: int, source: int) -> int:
+    def calc_respond_value(self, recv_priority: int, source: int, resource_type: str) -> int:
         if self.counter == recv_priority:
             if self.rank < source:
-                return 1
+                if resource_type == 'SPOT': return RESPOND_NEG_RESERVATION
+                elif resource_type == 'AIRSTRIP': return RESPOND_NEG_AIRSTRIP
             else:
-                return 0
+                if resource_type == 'SPOT': return RESPOND_POS_RESERVATION 
+                elif resource_type == 'AIRSTRIP': return RESPOND_POS_AIRSTRIP
         elif self.counter < recv_priority:
-            return 1
+            if resource_type == 'SPOT': return RESPOND_NEG_RESERVATION 
+            elif resource_type == 'AIRSTRIP': return RESPOND_NEG_AIRSTRIP
         elif self.counter > recv_priority:
-            return 0
+            if resource_type == 'SPOT': return RESPOND_POS_RESERVATION 
+            elif resource_type == 'AIRSTRIP': return RESPOND_POS_AIRSTRIP
 
     def send_requests(self) -> None:
         if self.state == STATES['reserving']:
@@ -73,55 +83,53 @@ class Plane():
     def receive_request(self, tag: int, source: int, data: Dict) -> None:
         if tag == TAGS['reservation']:
             if data['ship'] != self.desired_ship:
-                respond_value = 0
+                respond_value = RESPOND_POS_RESERVATION
             elif data['ship'] == self.desired_ship:
                 if self.state == STATES['reserving']:
-                    respond_value = self.calc_respond_value(data['priority'], source)
+                    respond_value = self.calc_respond_value(data['priority'], source, resource_type='SPOT')
                 else: # landing, idle, starting - means that place is taken
-                    respond_value = 1
+                    respond_value = RESPOND_NEG_RESERVATION
+
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
-            if respond_value == 1:
+            
+            if respond_value == RESPOND_NEG_RESERVATION:
                 self.reservation_list.add((source, data['id']))
-            # elif respond_value == 0 and source in self.airstrip_list:
-            #     self.airstrip_list.remove(source)
+
         elif tag == TAGS['landing']:
             if data['ship'] != self.desired_ship:
-                respond_value = 1
+                respond_value = RESPOND_POS_AIRSTRIP
             elif data['ship'] == self.desired_ship:
                 if self.state == STATES['landing']:
-                    respond_value = self.calc_respond_value(data['priority'], source)
+                    respond_value = self.calc_respond_value(data['priority'], source, resource_type='AIRSTRIP')
                 elif self.state == STATES['idle']:
-                    respond_value = 1
+                    respond_value = RESPOND_POS_AIRSTRIP
                 elif self.state == STATES['starting']:
-                    respond_value = 0
+                    respond_value = RESPOND_NEG_AIRSTRIP
                 elif self.state == STATES['reserving']:
-                    respond_value = 1
+                    respond_value = RESPOND_POS_AIRSTRIP
+            
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
-            # if source in self.reservation_list:
-            #     self.reservation_list.remove(source)
-            if respond_value == 0:
+
+            if respond_value == RESPOND_NEG_AIRSTRIP:
                 self.airstrip_list.add((source, data['id']))
-            # elif respond_value == 1 and source in self.airstrip_list:
-            #     self.airstrip_list.remove(source)
+            
         elif tag == TAGS['starting']:
             if data['ship'] != self.desired_ship:
-                respond_value = 1
+                respond_value = RESPOND_POS_AIRSTRIP
             elif data['ship'] == self.desired_ship:
                 if self.state == STATES['starting']:
-                    respond_value = self.calc_respond_value(data['priority'], source)
+                    respond_value = self.calc_respond_value(data['priority'], source, resource_type='AIRSTRIP')
                 elif self.state == STATES['idle']:
-                    respond_value = 1
+                    respond_value = RESPOND_POS_AIRSTRIP
                 elif self.state == STATES['landing']:
-                    respond_value = 1
+                    respond_value = RESPOND_POS_AIRSTRIP
                 elif self.state == STATES['reserving']:
-                    respond_value = 1
+                    respond_value = RESPOND_POS_AIRSTRIP
+
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
-            # if source in self.reservation_list:
-            #     self.reservation_list.remove(source)
-            if respond_value == 0:
+            
+            if respond_value == RESPOND_NEG_AIRSTRIP:
                 self.airstrip_list.add((source, data['id']))
-            # elif respond_value == 1 and source in self.airstrip_list:
-            #     self.airstrip_list.remove(source)
 
     def wait_for_responds(self) -> None:
         responds_count = 0
@@ -162,25 +170,27 @@ class Plane():
     def send_reservation_responds(self) -> None:
         for source, id in self.reservation_list:
             print(f"{self.rank} ({self.counter}): send reservation free to {source}")
-            comm.isend({'id': id, 'priority': self.counter, 'respond_value': -1}, dest=source, tag=TAGS['respond'])
+            comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_RESERVATION}, dest=source, tag=TAGS['respond'])
         self.reservation_list.clear()
 
     def send_airstrip_responds(self) -> None:
         for source, id in self.airstrip_list:
             print(f"{self.rank} ({self.counter}): send airstrip free to {source}")
-            comm.isend({'id': id, 'priority': self.counter, 'respond_value': 1}, dest=source, tag=TAGS['respond'])
+            comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_AIRSTRIP}, dest=source, tag=TAGS['respond'])
         self.airstrip_list.clear()
 
     def change_state(self) -> None:
         if self.state == STATES['reserving']:
             self.state = STATES['landing']
         elif self.state == STATES['landing']:
+            sleep(3)
             self.state = STATES['idle']
             self.send_airstrip_responds()
             self.idle(10)
         elif self.state == STATES['idle']:
             self.state = STATES['starting']
         elif self.state == STATES['starting']:
+            sleep(3)
             self.desired_ship = randint(0, len(SHIPS)-1)
             self.state = STATES['reserving']
             self.send_reservation_responds()
@@ -189,12 +199,12 @@ class Plane():
 
     def run(self) -> None:
         while True:
+            sleep(1.5)
+            print(f"{self.rank} ({self.counter}): {self.print_state()}")
             self.send_requests()
             self.wait_for_responds()
             self.request_id += 1
             self.change_state()
-            sleep(1.5)
-            print(f"{self.rank} ({self.counter}): {self.print_state()}")
 
 plane = Plane(rank)
 
