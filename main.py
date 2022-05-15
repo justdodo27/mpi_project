@@ -3,6 +3,7 @@ from mpi4py import MPI
 from time import sleep, time
 from datetime import datetime
 from random import randint
+import curses
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -32,7 +33,7 @@ RESPOND_POS_AIRSTRIP = 1
 RESPOND_NEG_AIRSTRIP = 0
 
 class Plane():
-    def __init__(self, rank: int):
+    def __init__(self, rank: int, stdscrn, win):
         self.status = MPI.Status()
         self.rank = rank
         self.counter = 0
@@ -41,6 +42,8 @@ class Plane():
         self.reservation_list = set()
         self.airstrip_list = set()
         self.request_id = self.rank * 100
+        self.stdscr = stdscrn
+        self.win = win
 
     def increment_counter(self) -> None:
         self.counter += 1
@@ -54,6 +57,12 @@ class Plane():
             return f'starting from {self.desired_ship}'
         elif self.state == 3:
             return f'idle on {self.desired_ship}...'
+
+    def print(self, text: str) -> None:
+        self.win.addstr(text)
+        self.win.noutrefresh()
+        self.stdscr.noutrefresh()
+        curses.doupdate()
 
     def calc_respond_value(self, recv_priority: int, source: int, resource_type: str) -> int:
         if self.counter == recv_priority:
@@ -156,7 +165,7 @@ class Plane():
         
     def idle(self, seconds: int) -> None:
         start_time = time()
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): {self.print_state()}")
+        self.print(f"{self.rank} ({self.counter}): {self.print_state()}\n")
         while True:
             if comm.iprobe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=self.status):
                 req = comm.irecv(source=self.status.Get_source(), tag=self.status.Get_tag())
@@ -170,13 +179,13 @@ class Plane():
 
     def send_reservation_responds(self) -> None:
         for source, id in self.reservation_list:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): send reservation free to {source}")
+            self.print(f"{self.rank} ({self.counter}): send res. free to {source}\n")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_RESERVATION}, dest=source, tag=TAGS['respond'])
         self.reservation_list.clear()
 
     def send_airstrip_responds(self) -> None:
         for source, id in self.airstrip_list:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): send airstrip free to {source}")
+            self.print(f"{self.rank} ({self.counter}): send as. free to {source}\n")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_AIRSTRIP}, dest=source, tag=TAGS['respond'])
         self.airstrip_list.clear()
 
@@ -203,10 +212,26 @@ class Plane():
             self.send_requests()
             self.wait_for_responds()
             sleep(1.5)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): {self.print_state()}")
+            self.print(f"{self.rank} ({self.counter}): {self.print_state()}\n")
             self.request_id += 1
             self.change_state()
 
-plane = Plane(rank)
+def main(stdscr):
+    curses.curs_set(0)  # cursor off.
+    curses.noecho()
+    curses.cbreak()
 
-plane.run()
+    scr_y = curses.LINES
+    scr_x = curses.COLS
+
+    win = curses.newwin(scr_y, scr_x // size, 0, (scr_x // size) * rank)
+    win.noutrefresh()
+
+    stdscr.noutrefresh()
+    curses.doupdate()
+
+    plane = Plane(rank, stdscr, win)
+    plane.run()
+
+if __name__ == '__main__':
+    curses.wrapper(main)
