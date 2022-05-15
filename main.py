@@ -1,9 +1,9 @@
 from typing import Dict
 from mpi4py import MPI
 from time import sleep, time
-from datetime import datetime
 from random import randint
 import curses
+import curses.panel
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -220,11 +220,12 @@ def main(stdscr):
     curses.curs_set(0)  # cursor off.
     curses.noecho()
     curses.cbreak()
-
+    
     scr_y = curses.LINES
     scr_x = curses.COLS
 
     win = curses.newwin(scr_y, scr_x // size, 0, (scr_x // size) * rank)
+    win.scrollok(True)
     win.noutrefresh()
 
     stdscr.noutrefresh()
