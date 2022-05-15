@@ -1,6 +1,7 @@
 from typing import Dict
 from mpi4py import MPI
 from time import sleep, time
+from datetime import datetime
 from random import randint
 
 comm = MPI.COMM_WORLD
@@ -155,7 +156,7 @@ class Plane():
         
     def idle(self, seconds: int) -> None:
         start_time = time()
-        print(f"{self.rank} ({self.counter}): {self.print_state()}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): {self.print_state()}")
         while True:
             if comm.iprobe(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=self.status):
                 req = comm.irecv(source=self.status.Get_source(), tag=self.status.Get_tag())
@@ -169,13 +170,13 @@ class Plane():
 
     def send_reservation_responds(self) -> None:
         for source, id in self.reservation_list:
-            print(f"{self.rank} ({self.counter}): send reservation free to {source}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): send reservation free to {source}")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_RESERVATION}, dest=source, tag=TAGS['respond'])
         self.reservation_list.clear()
 
     def send_airstrip_responds(self) -> None:
         for source, id in self.airstrip_list:
-            print(f"{self.rank} ({self.counter}): send airstrip free to {source}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): send airstrip free to {source}")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_AIRSTRIP}, dest=source, tag=TAGS['respond'])
         self.airstrip_list.clear()
 
@@ -199,10 +200,10 @@ class Plane():
 
     def run(self) -> None:
         while True:
-            sleep(1.5)
-            print(f"{self.rank} ({self.counter}): {self.print_state()}")
             self.send_requests()
             self.wait_for_responds()
+            sleep(1.5)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {self.rank} ({self.counter}): {self.print_state()}")
             self.request_id += 1
             self.change_state()
 
