@@ -1,10 +1,16 @@
-from typing import Dict
-from mpi4py import MPI
 from time import sleep, time
+from typing import Dict
 from random import randint
 import curses
 import curses.panel
+import threading
 
+import mpi4py
+mpi4py.rc.initialize = False
+
+from mpi4py import MPI
+
+MPI.Init_thread(2)
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -216,6 +222,12 @@ class Plane():
             self.request_id += 1
             self.change_state()
 
+    def foo(self) -> None:
+        while True:
+            sleep(1)
+            self.print(f"{self.rank} ({self.counter}) - XDD\n")
+        
+
 def main(stdscr):
     curses.curs_set(0)  # cursor off.
     curses.noecho()
@@ -232,7 +244,10 @@ def main(stdscr):
     curses.doupdate()
 
     plane = Plane(rank, stdscr, win)
-    plane.run()
+    x = threading.Thread(target=plane.run)
+    y = threading.Thread(target=plane.foo)
+    x.start()
+    y.start()
 
 if __name__ == '__main__':
     curses.wrapper(main)
