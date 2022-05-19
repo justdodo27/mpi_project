@@ -11,6 +11,24 @@ mpi4py.rc.initialize = False
 
 from mpi4py import MPI
 
+stdscr = curses.initscr()
+curses.curs_set(0)  # cursor off.
+curses.noecho()
+curses.cbreak()
+
+scr_y = curses.LINES
+scr_x = curses.COLS
+
+wins = []
+
+for i in range(5):
+    win = curses.newwin(scr_y, scr_x // 5, 0, (scr_x // 5) * i)
+    win.scrollok(True)
+    wins.append(win)
+
+stdscr.noutrefresh()
+curses.doupdate()
+
 MPI.Init_thread(2)
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -160,6 +178,7 @@ class Plane():
         elif self.state == STATES['landing']:
             sleep(LANDING_TIME)
             self.print(f"{self.rank} ({self.counter}): landed on {self.desired_ship}\n")
+            self.free_airstrip()
             self.state = STATES['idle']
             self.idle(IDLE_TIME)
         elif self.state == STATES['idle']:
@@ -167,6 +186,7 @@ class Plane():
         elif self.state == STATES['starting']:
             sleep(STARTING_TIME)
             self.print(f"{self.rank} ({self.counter}): started from {self.desired_ship}\n")
+            self.free_airstrip()
             self.desired_ship = randint(0, len(SHIPS)-1)
             self.state = STATES['reserving']
             self.free_spot()
@@ -184,9 +204,6 @@ class Plane():
     def communicate(self) -> None:
         local_id = self.request_id
         while True:
-            if self.state in (STATES['idle'], STATES['reserving']) and len(self.airstrip_list) > 0:
-                self.free_airstrip()
-
             req = comm.irecv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
             data = req.wait(status=self.status)
             tag = self.status.Get_tag()
@@ -205,26 +222,10 @@ class Plane():
                 self.receive_request(tag, source, data)
         
 
-def main(stdscr):
-    curses.curs_set(0)  # cursor off.
-    curses.noecho()
-    curses.cbreak()
-    
-    scr_y = curses.LINES
-    scr_x = curses.COLS
 
-    win = curses.newwin(scr_y, scr_x // size, 0, (scr_x // size) * rank)
-    win.scrollok(True)
-    
-    win.noutrefresh()
-    stdscr.noutrefresh()
-    curses.doupdate()
-
-    plane = Plane(rank, stdscr, win)
-    x = threading.Thread(target=plane.run)
-    y = threading.Thread(target=plane.communicate)
-    x.start()
-    y.start()
-
-if __name__ == '__main__':
-    curses.wrapper(main)
+win = wins[rank]
+plane = Plane(rank, stdscr, win)
+x = threading.Thread(target=plane.run)
+y = threading.Thread(target=plane.communicate)
+x.start()
+y.start()
