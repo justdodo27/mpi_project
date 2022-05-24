@@ -1,4 +1,6 @@
+from datetime import datetime
 from time import sleep
+from datetime import datetime
 from typing import Dict
 from random import randint
 import curses
@@ -11,23 +13,23 @@ mpi4py.rc.initialize = False
 
 from mpi4py import MPI
 
-stdscr = curses.initscr()
-curses.curs_set(0)  # cursor off.
-curses.noecho()
-curses.cbreak()
+# stdscr = curses.initscr()
+# curses.curs_set(0)  # cursor off.
+# curses.noecho()
+# curses.cbreak()
 
-scr_y = curses.LINES
-scr_x = curses.COLS
+# scr_y = curses.LINES
+# scr_x = curses.COLS
 
-wins = []
+# wins = []
 
-for i in range(5):
-    win = curses.newwin(scr_y, scr_x // 5, 0, (scr_x // 5) * i)
-    win.scrollok(True)
-    wins.append(win)
+# for i in range(5):
+#     win = curses.newwin(scr_y, scr_x // 5, 0, (scr_x // 5) * i)
+#     win.scrollok(True)
+#     wins.append(win)
 
-stdscr.noutrefresh()
-curses.doupdate()
+# stdscr.noutrefresh()
+# curses.doupdate()
 
 MPI.Init_thread(2)
 comm = MPI.COMM_WORLD
@@ -35,7 +37,8 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class Plane():
-    def __init__(self, rank: int, stdscrn, win):
+    # def __init__(self, rank: int, stdscrn, win):
+    def __init__(self, rank: int):
         self.status = MPI.Status()
         self.rank = rank
         self.counter = 0
@@ -46,8 +49,11 @@ class Plane():
         self.request_id = self.rank * 100
         self.responds_count = 0
         self.responds_value = 0
-        self.stdscr = stdscrn
-        self.win = win
+        # self.stdscr = stdscrn
+        # self.win = win
+        self.lock_free = threading.Lock()
+        self.lock_responds_list = threading.Lock()
+        self.responds_list = set()
 
     def increment_counter(self) -> None:
         self.counter += 1
@@ -63,13 +69,21 @@ class Plane():
             return f'idle on {self.desired_ship}...'
 
     def print(self, text: str) -> None:
-        self.win.addstr(text)
-        self.win.noutrefresh()
-        curses.doupdate()
-        self.stdscr.noutrefresh()
-        curses.doupdate()
+        current_time = datetime.now().time().strftime("%H:%M:%S")
+        print(f"[{current_time}] {text}")
+        # self.win.addstr(text)
+        # self.win.noutrefresh()
+        # curses.doupdate()
+        # self.stdscr.noutrefresh()
+        # curses.doupdate()
 
     def calc_respond_value(self, recv_priority: int, source: int, resource_type: str) -> int:
+        self.lock_responds_list.acquire()
+        if source in self.responds_list:
+            self.lock_responds_list.release()
+            if resource_type == 'SPOT': return RESPOND_NEG_RESERVATION
+            elif resource_type == 'AIRSTRIP': return RESPOND_NEG_AIRSTRIP
+        self.lock_responds_list.release()
         if self.counter == recv_priority:
             if self.rank < source:
                 if resource_type == 'SPOT': return RESPOND_NEG_RESERVATION
@@ -109,7 +123,9 @@ class Plane():
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
             
             if respond_value == RESPOND_NEG_RESERVATION:
+                self.lock_free.acquire()
                 self.reservation_list.add((source, data['id']))
+                self.lock_free.release()
 
         elif tag == TAGS['landing']:
             if data['ship'] != self.desired_ship:
@@ -127,7 +143,9 @@ class Plane():
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
 
             if respond_value == RESPOND_NEG_AIRSTRIP:
+                self.lock_free.acquire()
                 self.airstrip_list.add((source, data['id']))
+                self.lock_free.release()
             
         elif tag == TAGS['starting']:
             if data['ship'] != self.desired_ship:
@@ -145,7 +163,9 @@ class Plane():
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
             
             if respond_value == RESPOND_NEG_AIRSTRIP:
+                self.lock_free.acquire()
                 self.airstrip_list.add((source, data['id']))
+                self.lock_free.release()
 
     def wait_for_responds(self) -> None:
         while True:
@@ -156,28 +176,32 @@ class Plane():
                     break
         
     def idle(self, seconds: int) -> None:
-        self.print(f"{self.rank} ({self.counter}): {self.print_state()}\n")
+        self.print(f"{self.rank} ({self.counter}): {self.print_state()}")
         sleep(seconds)
         self.change_state()
 
     def free_spot(self) -> None:
+        self.lock_free.acquire()
         for source, id in self.reservation_list:
-            self.print(f"{self.rank} ({self.counter}): send res. free to {source}\n")
+            self.print(f"{self.rank} ({self.counter}): send res. free to {source}")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_RESERVATION}, dest=source, tag=TAGS['respond'])
         self.reservation_list.clear()
+        self.lock_free.release()
 
     def free_airstrip(self) -> None:
+        self.lock_free.acquire()
         for source, id in self.airstrip_list:
-            self.print(f"{self.rank} ({self.counter}): send as. free to {source}\n")
+            self.print(f"{self.rank} ({self.counter}): send as. free to {source}")
             comm.isend({'id': id, 'priority': self.counter, 'respond_value': FREE_AIRSTRIP}, dest=source, tag=TAGS['respond'])
         self.airstrip_list.clear()
+        self.lock_free.release()
 
     def change_state(self) -> None:
         if self.state == STATES['reserving']:
             self.state = STATES['landing']
         elif self.state == STATES['landing']:
             sleep(LANDING_TIME)
-            self.print(f"{self.rank} ({self.counter}): landed on {self.desired_ship}\n")
+            self.print(f"{self.rank} ({self.counter}): landed on {self.desired_ship}")
             self.free_airstrip()
             self.state = STATES['idle']
             self.idle(IDLE_TIME)
@@ -185,19 +209,22 @@ class Plane():
             self.state = STATES['starting']
         elif self.state == STATES['starting']:
             sleep(STARTING_TIME)
-            self.print(f"{self.rank} ({self.counter}): started from {self.desired_ship}\n")
-            self.free_airstrip()
+            self.print(f"{self.rank} ({self.counter}): started from {self.desired_ship}")
             self.desired_ship = randint(0, len(SHIPS)-1)
             self.state = STATES['reserving']
+            self.free_airstrip()
             self.free_spot()
         self.increment_counter()
+        self.lock_responds_list.acquire()
+        self.responds_list.clear()
+        self.lock_responds_list.release()
 
     def run(self) -> None:
         while True:
             self.send_requests()
             self.wait_for_responds()
             sleep(1.5)
-            self.print(f"{self.rank} ({self.counter}): {self.print_state()}\n")
+            self.print(f"{self.rank} ({self.counter}): {self.print_state()}")
             self.request_id += 1
             self.change_state()
 
@@ -218,13 +245,17 @@ class Plane():
                 if self.request_id == data['id']:
                     self.responds_count += 1
                     self.responds_value += data['respond_value']
+                    self.lock_responds_list.acquire()
+                    self.responds_list.add(source)
+                    self.lock_responds_list.release()
             else:
                 self.receive_request(tag, source, data)
         
 
 
-win = wins[rank]
-plane = Plane(rank, stdscr, win)
+# win = wins[rank]
+# plane = Plane(rank, stdscr, win)
+plane = Plane(rank)
 x = threading.Thread(target=plane.run)
 y = threading.Thread(target=plane.communicate)
 x.start()
