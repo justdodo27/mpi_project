@@ -10,9 +10,10 @@ STATES = {
     'landing': 1,
     'starting': 2,
     'idle': 3,
+    'local': 4,
 }
 
-SHIPS = [2,2]
+SHIPS = [1, 1]
 
 FREE_RESERVATION = -1
 FREE_AIRSTRIP = 1
@@ -24,3 +25,4 @@ RESPOND_NEG_AIRSTRIP = 0
 LANDING_TIME = 3
 STARTING_TIME = 3
 IDLE_TIME = 10
+LOCAL_TIME = 20

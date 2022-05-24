@@ -117,6 +117,8 @@ class Plane():
             elif data['ship'] == self.desired_ship:
                 if self.state == STATES['reserving']:
                     respond_value = self.calc_respond_value(data['priority'], source, resource_type='SPOT')
+                elif self.state == STATES['local']:
+                    respond_value = RESPOND_POS_RESERVATION
                 else: # landing, idle, starting - means that place is taken
                     respond_value = RESPOND_NEG_RESERVATION
 
@@ -139,6 +141,8 @@ class Plane():
                     respond_value = RESPOND_NEG_AIRSTRIP
                 elif self.state == STATES['reserving']:
                     respond_value = RESPOND_POS_AIRSTRIP
+                elif self.state == STATES['local']:
+                    respond_value = RESPOND_POS_AIRSTRIP
             
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
 
@@ -159,6 +163,9 @@ class Plane():
                     respond_value = RESPOND_POS_AIRSTRIP
                 elif self.state == STATES['reserving']:
                     respond_value = RESPOND_POS_AIRSTRIP
+                elif self.state == STATES['local']:
+                    respond_value = RESPOND_POS_AIRSTRIP
+                
 
             comm.isend({'id': data['id'], 'priority': self.counter, 'respond_value': respond_value}, dest=source, tag=TAGS['respond'])
             
@@ -210,10 +217,15 @@ class Plane():
         elif self.state == STATES['starting']:
             sleep(STARTING_TIME)
             self.print(f"{self.rank} ({self.counter}): started from {self.desired_ship}")
-            self.desired_ship = randint(0, len(SHIPS)-1)
-            self.state = STATES['reserving']
+            self.state = STATES['local']
             self.free_airstrip()
             self.free_spot()
+            self.print(f"{self.rank} ({self.counter}): flying")
+            sleep(LOCAL_TIME)
+            self.change_state()
+        elif self.state == STATES['local']:
+            self.desired_ship = randint(0, len(SHIPS)-1)
+            self.state = STATES['reserving']
         self.increment_counter()
         self.lock_responds_list.acquire()
         self.responds_list.clear()
